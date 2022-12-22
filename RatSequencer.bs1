@@ -1,0 +1,172 @@
+' =========================================================================
+'
+'   File....... MultiSequencer.BS1
+'   Purpose.... Multitasking Sequencer Engine for Props
+'   Author..... Allen Huffman
+'   E-mail..... alsplace@pobox.com
+'   Based on... Sequencer code by Jon Williams -- Parallax, Inc.
+'   Started.... 02 OCT 2005
+'   Updated.... 07 JUN 2005
+'
+'   {$STAMP BS1}
+'   {$PBASIC 1.0}
+'
+' =========================================================================
+
+
+' -----[ Program Description ]---------------------------------------------
+
+
+' -----[ Revision History ]------------------------------------------------
+
+
+' -----[ I/O Definitions ]-------------------------------------------------
+
+SYMBOL  Trigger1         = PIN7                  ' from trigger device
+SYMBOL  Trigger2         = PIN6
+
+' -----[ Constants ]-------------------------------------------------------
+
+SYMBOL  Pushed        = 1                     ' for active-high input
+SYMBOL  NotPushed     = 0
+
+SYMBOL  Yes           = 1
+SYMBOL  No            = 0
+
+SYMBOL  DelayRes        = 10                   ' 100 ms delay resolution
+
+' -----[ Variables ]-------------------------------------------------------
+
+SYMBOL  pntr1            = B0                    ' record pointer
+SYMBOL  ctrl1            = B1                    ' control outputs
+SYMBOL  timer1           = B2                    ' step timer ( x DelayRes )
+
+SYMBOL  pntr2            = B3                    ' record pointer
+SYMBOL  ctrl2            = B4                    ' control outputs
+SYMBOL  timer2           = B5                    ' step timer ( x DelayRes )
+
+SYMBOL  seq1             = B6
+SYMBOL  counter1         = B7
+
+SYMBOL  seq2             = B8
+SYMBOL  counter2         = B9
+
+SYMBOL  pinstatus        = B10
+
+' -----[ EEPROM Data ]-----------------------------------------------------
+
+' Sequence Database
+' -- each entry has two bytes: outputs, timing (1 - 255 units x DelayRes)
+
+SYMBOL  seq1start       = 0
+SYMBOL  seq1mask        = %11111100
+Sequence1:
+  EEPROM (%00000001, 2)
+  EEPROM (%00000010, 2)
+  EEPROM (%00000000, 500)
+  EEPROM (%00000000, 0)
+  EEPROM (%00000000, 0)
+  EEPROM (%00000000, 0)
+  EEPROM (%00000000, 0)                         ' end of sequence
+
+SYMBOL  seq2start       = 14
+SYMBOL  seq2mask        = %11110011
+Sequence2:
+  EEPROM (%00000100, 2)
+  EEPROM (%00001000, 2)
+  EEPROM (%00000000, 10)
+  EEPROM (%00001000, 1)
+  EEPROM (%00000100, 1)
+  EEPROM (%00000000, 500)
+  EEPROM (%00000000, 0)                         ' end of sequence
+
+' -----[ Initialization ]--------------------------------------------------
+
+Reset:
+  DIRS = %00111111                              ' P0 - P5 are outputs
+  PINS = %00000000
+  seq1 = No
+  seq2 = No
+' -----[ Program Code ]----------------------------------------------------
+
+Main:
+  IF Trigger1 = Pushed THEN Start1                     ' wait for trigger
+Main2:
+  IF Trigger2 = Pushed THEN Start2
+Main3:
+  ' See if we have any processing to do
+  GOSUB Process1
+  GOSUB Process2
+  GOTO Main
+
+Start1:
+  IF seq1 = Yes THEN Main2
+  seq1 = Yes
+  counter1 = 0
+  pntr1 = SEQ1START
+  GOSUB Process1
+  GOTO Main2
+
+Process1:
+  ' See what we need to do. Are we waiting for a previous cmd to complete?
+  IF seq1 = No THEN SkipIt
+  IF counter1 > 0 THEN Delay
+
+  READ pntr1, ctrl1                               ' read outputs
+  pntr1 = pntr1 + 1                               ' point to timing byte
+  READ pntr1, timer1                              ' read timing byte
+
+  pinstatus = PINS & seq1mask
+  PINS = ctrl1 | pinstatus                                  ' refresh output pins
+
+  IF timer1 = 0 THEN Stop1                        ' test for end
+  counter1 = timer1 * DelayRes
+  pntr1 = pntr1 + 1                               ' point to next record
+
+Delay:
+  counter1 = counter1 - 1
+
+SkipIt:
+  RETURN
+
+Stop1:
+  seq1 = No
+  GOTO SkipIt
+
+Start2:
+  IF seq2 = Yes THEN Main3
+  seq2 = Yes
+  counter2 = 0
+  pntr2 = SEQ2START
+  GOSUB Process2
+  GOTO Main3
+
+Process2:
+  ' See what we need to do. Are we waiting for a previous cmd to complete?
+  IF seq2 = No THEN SkipIt
+  IF counter2 > 0 THEN Delay2
+
+  READ pntr2, ctrl2                               ' read outputs
+  pntr2 = pntr2 + 1                               ' point to timing byte
+  READ pntr2, timer2                              ' read timing byte
+
+  pinstatus = PINS & seq2mask
+  PINS = ctrl2 | pinstatus                                  ' refresh output pins
+
+  IF timer2 = 0 THEN Stop2                        ' test for end
+  counter2 = timer2 * DelayRes
+  pntr2 = pntr2 + 1                               ' point to next record
+
+Delay2:
+  counter2 = counter2 - 1
+
+  SkipIt2:
+  RETURN
+
+Stop2:
+  seq2 = No
+  GOTO SkipIt2
+
+  END
+
+' -----[ Subroutines ]-----------------------------------------------------

@@ -1,0 +1,79 @@
+'{$STAMP BS2}
+'{$PBASIC 2.5}
+' =========================================================================
+'
+'   File....... Police_Lights.BS1
+'   Purpose....
+'   Author..... Parallax EFX
+'   E-mail..... support@parallax.com
+'   Started....
+'   Updated.... 12 APR 2005
+'
+'   {$STAMP BS1}
+'   {$PBASIC 1.0}
+'
+' =========================================================================
+
+
+' -----[ I/O Definitions ]-------------------------------------------------
+
+SYMBOL  Trigger         = PIN7
+SYMBOL  Lights          = PINS
+
+
+' -----[ Constants ]-------------------------------------------------------
+
+SYMBOL  Yes             = 1                     ' for active-high input
+SYMBOL  No              = 0
+
+SYMBOL  Speed           = 75                    ' delay between steps
+
+
+' -----[ Variables ]-------------------------------------------------------
+
+SYMBOL  pattern         = B0                    ' pattern data
+SYMBOL  done            = BIT7                  ' end-of-cycle flag
+SYMBOL  pntr            = B1                    ' pointer into table
+
+
+' -----[ EEPROM Data ]-----------------------------------------------------
+
+Police:
+  EEPROM (%00111000)
+  EEPROM (%00011001)
+  EEPROM (%00111000)
+  EEPROM (%00011001)
+  EEPROM (%00111000)
+  EEPROM (%00011001)
+  EEPROM (%00100110)
+  EEPROM (%00000111)
+  EEPROM (%00100110)
+  EEPROM (%00000111)
+  EEPROM (%00100110)
+  EEPROM (%00000111)
+  EEPROM (%10000000)                            ' end of cycle marker
+
+
+' -----[ Initialization ]--------------------------------------------------
+
+Reset:
+  DIRS = %00111111                              ' make lights pins outputs
+  Lights = %00000000                            ' clear lights
+
+
+' -----[ Program Code ]----------------------------------------------------
+
+Main:
+  IF Trigger = No THEN Reset                    ' wait for trigger
+  READ pntr, pattern                            ' get pattern from table
+  IF done = No THEN Update_Lights               ' check for end
+  pntr = 0                                      ' -- reset pointer
+  GOTO Main
+
+Update_Lights:
+  Lights = pattern                              ' update lights
+  PAUSE Speed                                   ' hold for step
+  pntr = pntr + 1                               ' point to next table item
+  GOTO Main                                     ' back to beginning
+
+  END

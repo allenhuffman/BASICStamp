@@ -1,0 +1,120 @@
+' =========================================================================
+'
+'   File....... Sequencer.BS1
+'   Purpose.... Sequencer Engine for Props
+'   Author..... Jon Williams -- Parallax, Inc.
+'   E-mail..... jwilliams@parallax.com
+'   Started....
+'   Updated.... 07 JUN 2005
+'
+'   {$STAMP BS1}
+'   {$PBASIC 1.0}
+'
+' =========================================================================
+
+
+' -----[ Program Description ]---------------------------------------------
+
+
+' -----[ Revision History ]------------------------------------------------
+
+
+' -----[ I/O Definitions ]-------------------------------------------------
+
+SYMBOL  Trigger         = PIN7                  ' from trigger device
+
+
+' -----[ Constants ]-------------------------------------------------------
+
+SYMBOL  Yes             = 1                     ' for active-high input
+SYMBOL  No              = 0
+
+SYMBOL  DelayRes        = 120                   ' 100 ms delay resolution
+
+
+' -----[ Variables ]-------------------------------------------------------
+
+SYMBOL  pntr            = B0                    ' record pointer
+SYMBOL  ctrl            = B1                    ' control outputs
+SYMBOL  timer           = B2                    ' step timer ( x DelayRes )
+
+' -----[ EEPROM Data ]-----------------------------------------------------
+
+' Sequence Database
+' -- each entry has two bytes: outputs, timing (1 - 255 units x DelayRes)
+
+ZigZag:
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 4)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 3)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 3)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 4)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 3)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 4)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 2)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 3)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 4)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 5)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 6)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 7)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 8)
+  EEPROM (%00000001, 1)
+  EEPROM (%00000000, 10)
+  EEPROM (%00000010, 40)
+  EEPROM (%00000011, 2 )
+  EEPROM (%00000000, 60)
+  EEPROM (%00000000, 0)                         ' end of sequence
+
+' -----[ Initialization ]--------------------------------------------------
+
+Reset:
+  DIRS = %01111111                              ' P0 - P6 are outputs
+
+' -----[ Program Code ]----------------------------------------------------
+
+Main:
+  IF Trigger = Yes THEN Main                     ' wait for trigger
+
+Repeat:
+
+Sequencer:
+  pntr = 0                                      ' reset record pointer
+
+Get_Record:
+  READ pntr, ctrl                               ' read outputs
+  pntr = pntr + 1                               ' point to timing byte
+  READ pntr, timer                              ' read timing byte
+  pntr = pntr + 1                               ' point to next record
+  IF timer = 0 THEN Repeat                        ' test for end
+
+Update_Outputs:
+  PINS = ctrl                                   ' refresh output pins
+
+Delay:
+  PAUSE DelayRes                                ' wait
+  timer = timer - 1                             ' update timer
+  IF timer = 0 THEN Get_Record                  ' expired?
+  IF Trigger = No THEN Stop
+  GOTO Delay                                    ' -- no, keep timing
+
+Stop:
+  PINS = %00000000
+WaitHere:
+  IF Trigger = No THEN WaitHere
+  GOTO Main
+  END
+
+
+' -----[ Subroutines ]-----------------------------------------------------

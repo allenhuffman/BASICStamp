@@ -1,0 +1,56 @@
+' {$STAMP BS1}
+' {$PBASIC 1.0}
+
+SYMBOL  Sio   = 5
+SYMBOL  Trigger         = PIN7                  ' from trigger device
+
+SYMBOL  Baud  = OT2400
+SYMBOL  Addr  = %11
+
+SYMBOL  IsOn  = 1
+SYMBOL  IsOff = 0
+
+SYMBOL  Yes             = 1                     ' for active-high input
+SYMBOL  No              = 0
+
+SYMBOL  id0   = B0
+SYMBOL  id1   = B1
+SYMBOL  id2   = B2
+
+Reset:
+  DEBUG CLS
+'  DIRS = %00011111                              ' P0 - P6 are outputs
+
+  DEBUG "Start", CR
+Main:
+  IF Trigger = Yes THEN Main                     ' wait for trigger
+  DEBUG "Trigger", CR
+
+  SEROUT  Sio, Baud, ("!RC4", Addr, "V" )
+  SERIN   Sio, Baud, id0, id1, id2
+  DEBUG   "RC-4 Version ", #@id0, #@id1, #@id2, CR
+
+ Test_RelayCtrl:
+  FOR id0 = 1 TO 4
+    SEROUT  Sio, Baud, ("!RC4", Addr, "R", id0, IsOn )
+    GOSUB Show_Status
+    PAUSE 500
+  NEXT
+  FOR id0 = 1 TO 4
+    SEROUT  Sio, Baud, ("!RC4", Addr, "R", id0, IsOff )
+    GOSUB Show_Status
+    PAUSE 500
+  NEXT
+
+Test_Ignore:
+  SEROUT  Sio, Baud, ("!RC4", Addr, "R", 5, IsOn )
+  GOSUB Show_Status
+
+  GOTO Reset
+  END
+
+Show_Status:
+  SEROUT  Sio, Baud, ("!RC4", Addr, "G" )
+  SERIN   Sio, Baud, id1
+  DEBUG   CR, "Status = ", #%id1
+  RETURN

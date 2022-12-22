@@ -1,0 +1,142 @@
+' =========================================================================
+'
+'   File....... Multi-Sequence.BS1
+'   Purpose....
+'   Author..... Jon Williams -- Parallax EFX
+'               -- based on code by Allen Huffman
+'   E-mail..... jwilliams@parallax.com
+'   Started....
+'   Updated.... 04 OCT 2005
+'
+'   {$STAMP BS1}
+'   {$PBASIC 1.0}
+'
+' =========================================================================
+
+
+' -----[ Program Description ]---------------------------------------------
+
+
+' -----[ Revision History ]------------------------------------------------
+
+
+' -----[ I/O Definitions ]-------------------------------------------------
+
+SYMBOL  Trigger1        = PIN7
+SYMBOL  Trigger2        = PIN6
+
+
+' -----[ Constants ]-------------------------------------------------------
+
+SYMBOL  IsOn            = 1                     ' for active-high input
+SYMBOL  IsOff           = 0
+
+SYMBOL  Running         = 1
+SYMBOL  Stopped         = 0
+
+SYMBOL  Yes             = 1
+SYMBOL  No              = 0
+
+SYMBOL  TimerRes        = 100                   ' loop timing (ms)
+
+
+' -----[ Variables ]-------------------------------------------------------
+
+SYMBOL  status          = B0                    ' sequence status flags
+SYMBOL  seq1            = BIT0
+SYMBOL  seq2            = BIT1
+SYMBOL  pinsTemp        = B1                    ' temporary output
+SYMBOL  endOfSeq        = BIT15                 ' 1 = end of sequence
+SYMBOL  idx1            = B2                    ' pointer for seq 1
+SYMBOL  timer1          = B3                    ' timer for seq 1
+SYMBOL  idx2            = B4
+SYMBOL  timer2          = B5
+SYMBOL  eePntr          = B6                    ' pointer into EEPROM
+
+
+' -----[ EEPROM Data ]-----------------------------------------------------
+
+SYMBOL  Seq1Start       = 0
+SYMBOL  Seq1Max         = 11
+SYMBOL  Seq1Mask        = %00111000             ' protect P3-P5
+
+Sequence1:
+  EEPROM (%00000001, 5)
+  EEPROM (%00000010, 5)
+  EEPROM (%00000100, 5)
+  EEPROM (%00000010, 5)
+  EEPROM (%00000001, 5)
+  EEPROM (%10000000, 0)
+
+
+SYMBOL  Seq2Start       = 12
+SYMBOL  Seq2Max         = 11
+SYMBOL  Seq2Mask        = %00000111             ' protect P0-P2
+
+Sequence2:
+  EEPROM (%00100000, 2)
+  EEPROM (%00010000, 2)
+  EEPROM (%00001000, 2)
+  EEPROM (%00010000, 2)
+  EEPROM (%00100000, 2)
+  EEPROM (%10000000, 0)
+
+
+' -----[ Initialization ]--------------------------------------------------
+
+Reset:
+  PINS = %00000000                              ' clear outputs
+  DIRS = %00111111                              ' set to output mode
+
+
+' -----[ Program Code ]----------------------------------------------------
+
+Check_1:
+  IF Trigger1 = IsOff THEN Check_2
+    seq1 = Running
+
+Check_2:
+  IF Trigger2 = IsOff THEN Run_1
+    seq2 = Running
+
+
+Run_1:
+  IF seq1 = Stopped THEN Run_2
+    IF timer1 = 0 THEN Reload_1
+      timer1 = timer1 - 1
+      GOTO Run_2
+
+Reload_1:
+  idx1 = idx1 + 1 // Seq1Max
+  eePntr = Seq1Start + idx1
+  READ eePntr, pinsTemp
+  PINS = PINS & Seq1Mask | pinsTemp
+  eePntr = eePntr + 1
+  READ eePntr, timer1
+  IF endOfSeq = No THEN Run_2
+    seq1 = Stopped
+
+
+Run_2:
+  IF seq2 = Stopped THEN Loop_Pad
+    IF timer2 = 0 THEN Reload_2
+      timer2 = timer2 - 1
+      GOTO Loop_Pad
+
+Reload_2:
+  idx2 = idx2 + 1 // Seq2Max
+  eePntr = Seq2Start + idx2
+  READ eePntr, pinsTemp
+  PINS = PINS & Seq2Mask | pinsTemp
+  eePntr = eePntr + 1
+  READ eePntr, timer2
+  IF endOfSeq = No THEN Loop_Pad
+    seq2 = Stopped
+
+
+Loop_Pad:
+  PAUSE TimerRes
+  GOTO Check_1
+
+
+' -----[ Subroutines ]-----------------------------------------------------

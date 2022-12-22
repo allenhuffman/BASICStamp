@@ -1,0 +1,239 @@
+' =========================================================================
+'
+'   File....... Dual-Sequencer-MaxOuts-RC4.BS1
+'   Purpose....
+'   Author..... Jon Williams -- Parallax EFX
+'               -- based on code by Allen Huffman
+'   E-mail..... jwilliams@parallax.com
+'   Started....
+'   Updated.... 06 OCT 2005
+'
+'   {$STAMP BS1}
+'   {$PBASIC 1.0}
+'
+' =========================================================================
+
+
+' -----[ Program Description ]---------------------------------------------
+'
+' This program converts the Prop-1 into a dual timer capable of simultane-
+' ously and independently controlling two individual props.  The outputs
+' for each prop are defined by an EEPROM table.  Each record in the table
+' holds the new outputs for a given state as well as the timing for that
+' state.  Bit7 of the outputs value indicates the end of the sequence. It
+' is the programmer's responsibility to set Seq1Start and Seq2Start to
+' the proper values before downloading the program.
+'
+' Bit6 of the outputs value flags an RC4 relay sequence, with Bits 0-3
+' being sent to the RC4.
+'
+' This program allows either sequence to access to any of the output
+' pints (P0 - P5).
+
+
+' -----[ Revision History ]------------------------------------------------
+'
+' 06 OCT 2005 - Added RC4 support. Needs to be optimized. (ach)
+' 18 OCT 2007 - Updating to use on old Rat Sewer hardware. (ach)
+
+' -----[ I/O Definitions ]-------------------------------------------------
+
+SYMBOL  Trigger1        = PIN7
+SYMBOL  Trigger2        = PIN6
+
+' -----[ Constants ]-------------------------------------------------------
+
+SYMBOL  IsOn            = 1                     ' for active-high input
+SYMBOL  IsOff           = 0
+
+SYMBOL  Running         = 1                     ' statut flags
+SYMBOL  Stopped         = 0
+
+SYMBOL  Yes             = 1
+SYMBOL  No              = 0
+
+SYMBOL  rc4Sio          = 5                     ' RC4: IO pin for RC4 control
+SYMBOL  rc4Baud         = OT2400                ' RC4:
+SYMBOL  rc4Addr         = %11                   ' RC4: hard coded for now
+
+' -----[ Variables ]-------------------------------------------------------
+
+SYMBOL  status          = B0                    ' sequence status flags
+SYMBOL  seq1            = BIT0
+SYMBOL  seq2            = BIT1
+SYMBOL  pinsTemp        = B1                    ' temporary output
+SYMBOL  endOfSeq        = BIT15                 ' 1 = end of sequence
+SYMBOL  RC4Control      = BIT14                 ' 1 = emit to RC4
+
+SYMBOL  loopTmr         = B2
+
+SYMBOL  pntr1           = B3                    ' pointer for seq 1
+SYMBOL  seq1Outs        = B4                    ' sequence 1 output(s)
+SYMBOL  timer1          = B5                    ' timer for seq 1
+
+SYMBOL  pntr2           = B6
+SYMBOL  seq2Outs        = B7
+SYMBOL  timer2          = B8
+
+SYMBOL  rc4temp         = B9                    ' RC4:
+SYMBOL  rc4seq1Outs     = B10                   ' RC4:
+SYMBOL  rc4seq2Outs     = B11                   ' RC4:
+
+' -----[ EEPROM Data ]-----------------------------------------------------
+
+' Timing value is in 100 millisecond units
+' -- trigger check loop is 5 iterations x 20 ms
+
+SYMBOL ResetDelay = 50
+
+SYMBOL  Seq2Start       = 0                    ' start point in EE
+
+' Format: %87654321
+'          xxxxxxx1 = gas chamber head
+'          xxxxxx1x = gas chamber stand
+'          xxxxx1xx = pop up
+'          xxxx1xxx = not used (extra 12V output)
+'          x1xxnnnn = RC4 control (n=ID)
+'          x1xxxxx1 = RC4 fogger
+'          x1xxxx11 = RC4 strobe light
+
+' Crawlway Pop-up
+Sequence2:
+  EEPROM (%00000000, 10) ' delay
+  EEPROM (%00000100, 8) ' pop up!
+  EEPROM (%00000000, 30) ' go back down
+  EEPROM (%00000100, 8) ' pop back up!
+  EEPROM (%00000000, ResetDelay) ' wait before triggering again
+  EEPROM (%10000000, 0)
+
+SYMBOL  Seq1Start       = 12                     ' start point in EE
+
+' Gas Chamber
+Sequence1:
+'  EEPROM (%01001000, 10) ' RC4: turn fogger on
+  EEPROM (%01000011, 2) ' RC4: turn strobe on, keep fogger on
+  EEPROM (%01000011, 2) ' RC4: turn strobe on, keep fogger on
+  EEPROM (%00000001, 1) ' Head forward
+  EEPROM (%00000000, 3) ' head back
+  EEPROM (%00000001, 1) ' head forward
+  EEPROM (%00000000, 4) ' head back
+  EEPROM (%00000001, 1) ' head forward
+  EEPROM (%00000000, 5) ' head back
+  EEPROM (%00000001, 1) ' head forward
+  EEPROM (%00000000, 6) ' head back
+  EEPROM (%00000001, 1) ' head forward
+  EEPROM (%00000000, 7) ' head back
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 4)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 2)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 3)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 4)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 5)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 6)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 7)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 8)
+'  EEPROM (%00000001, 1)
+'  EEPROM (%00000000, 10)
+  EEPROM (%01000001, 0) ' RC4: keep strobe on, fogger off
+  EEPROM (%00000010, 10) ' stand up!
+'  EEPROM (%00000011, 2 )
+  EEPROM (%00000000, 40) ' sit back down
+  EEPROM (%00000001, 4) ' head forward
+  EEPROM (%00000000, 6) ' head back
+  EEPROM (%01000000, 0) ' RC4: turn strobe
+  EEPROM (%00000000, ResetDelay) ' wait before triggering again
+  EEPROM (%01000000, 0) ' RC4: turn strobe off
+  EEPROM (%10000000, 0)                         ' end of sequence
+
+
+' -----[ Initialization ]--------------------------------------------------
+
+Reset:
+  PINS = %00000000                              ' clear outputs
+  DIRS = %00111111                              ' set to output mode
+
+  pntr1 = Seq1Start                             ' initialize pointers
+  pntr2 = Seq2Start
+
+' -----[ Program Code ]----------------------------------------------------
+
+Main:                                           ' test triggers, pad loop
+  FOR loopTmr = 1 TO 5                          ' text 5x
+    seq1 = seq1 | Trigger1                      ' update running flag
+    seq2 = seq2 | Trigger2                      ' update running flag
+    PAUSE 20                                    ' 5 x 20 ms = 100 ms
+  NEXT
+
+' Always run Nurse
+'seq2 = Running
+
+Run_1:
+  IF seq1 = Stopped THEN Run_2                  ' running?
+    IF timer1 = 0 THEN Reload_1                 '  yes, timer expried?
+      timer1 = timer1 - 1                       '   no, decrement timer
+      GOTO Run_2
+
+Reload_1:
+  READ pntr1, pinsTemp                          ' read output state
+  IF RC4Control = No THEN Skip_1                ' RC4: check for RC4 control bit
+  'rc4addr = pinsTemp & %00110000 / 16          ' RC4: get RC4 address
+  rc4seq1Outs = pinsTemp & %00001111            ' RC4: get relays
+  rc4temp = rc4seq1Outs | rc4seq2Outs           ' RC4:
+  GOSUB RC4                                     ' RC4: handle it...
+  GOTO Skip_12:                                 ' RC4:then skip normal processing
+Skip_1:                                         ' RC4:
+  seq1Outs = pinsTemp                           ' copy to s1 storage
+  PINS = seq1Outs | seq2Outs                    ' apply new outputs
+'  DEBUG "GASCH= ", #%PINS, CR
+Skip_12:                                        ' RC4:
+  pntr1 = pntr1 + 1                             ' point to timing
+  READ pntr1, timer1                            ' read it
+  pntr1 = pntr1 + 1                             ' point to next record
+  IF endOfSeq = No THEN Run_2                   ' at end?
+    seq1 = Stopped                              ' - stop sequence
+    pntr1 = Seq1Start                           ' - reset pointer
+
+Run_2:
+  IF seq2 = Stopped THEN Main                   ' running?
+    IF timer2 = 0 THEN Reload_2                 '  yes, timer expried?
+      timer2 = timer2 - 1                       '   no, decrement timer
+      GOTO Main
+
+Reload_2:
+  READ pntr2, pinsTemp                          ' read output state
+  IF RC4Control = No THEN Skip_2                ' RC4: check for RC4 control bit
+  'rc4addr = pinsTemp & %00110000 / 16          ' RC4: get RC4 address
+  rc4seq2Outs = pinsTemp & %00001111            ' RC4: get relays
+  rc4temp = rc4seq1Outs | rc4seq2Outs           ' RC4:
+  GOSUB RC4                                     ' RC4: handle it...
+  GOTO Skip_22:                                 ' RC4:then skip normal processing
+Skip_2:                                         ' RC4:
+  seq2Outs = pinsTemp                           ' copy to s2 storage
+  PINS = seq1Outs | seq2Outs                    ' apply new outputs
+'  DEBUG "POPUP= ", #%PINS, CR
+Skip_22:                                        ' RC4:
+  pntr2 = pntr2 + 1                             ' point to timing
+  READ pntr2, timer2                            ' read it
+  pntr2 = pntr2 + 1                             ' point to next record
+  IF endOfSeq = No THEN Main                    ' at end?
+    seq2 = Stopped                              ' - stop sequence
+    pntr2 = Seq2Start                           ' - reset pointer
+
+  GOTO Main
+
+' -----[ Subroutines ]-----------------------------------------------------
+
+RC4:
+'  DEBUG "RC4 addr ", #rc4Addr, " val ", #%rc4temp, CR
+'  DEBUG "RC4  = ", #%rc4temp, CR
+  SEROUT  rc4Sio, rc4Baud, ("!RC4", rc4Addr, "S", rc4temp )
+  RETURN
+
+  END

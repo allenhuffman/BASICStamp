@@ -1,0 +1,96 @@
+' =========================================================================
+'
+'   File....... Sequencer.BS1
+'   Purpose.... Sequencer Engine for Props
+'   Author..... Jon Williams -- Parallax, Inc.
+'   E-mail..... jwilliams@parallax.com
+'   Started....
+'   Updated.... 07 JUN 2005
+'
+'   {$STAMP BS1}
+'   {$PBASIC 1.0}
+'
+' =========================================================================
+
+
+' -----[ Program Description ]---------------------------------------------
+
+
+' -----[ Revision History ]------------------------------------------------
+
+
+' -----[ I/O Definitions ]-------------------------------------------------
+
+SYMBOL  Trigger1         = PIN7                  ' from trigger device
+SYMBOL  Trigger2         = PIN6
+SYMBOL  Trigger3         = PIN5
+
+' -----[ Constants ]-------------------------------------------------------
+
+SYMBOL  Yes             = 1                     ' for active-high input
+SYMBOL  No              = 0
+
+SYMBOL  On = 1
+SYMBOL  Off = 0
+
+' -----[ Variables ]-------------------------------------------------------
+
+' -----[ Initialization ]--------------------------------------------------
+
+Reset:
+  DIRS = %00001111                              ' P0 - P6 are outputs
+  PINS = %00000000
+
+' -----[ Program Code ]----------------------------------------------------
+
+Test:
+  PINS = %00000001
+  PAUSE 100
+  PINS = %00000010
+  PAUSE 100
+  PINS = %00000100
+  PAUSE 100
+  PINS = %00001000
+  PAUSE 100
+
+Main:
+Check1:
+  IF Trigger1 = Yes THEN Light0On                     ' wait for trigger
+Check2:
+  IF Trigger2 = Yes THEN Light1On
+Check3:  IF Trigger3 = Yes THEN Light2On
+  GOTO Main
+
+Light0On:
+  DEBUG "Light0On", CR
+  PIN0 = On
+  PAUSE 500
+  PIN0 = Off
+  GOTO Check2
+
+Light1On:
+  DEBUG "Light1On", CR
+  PIN1 = On
+  PAUSE 500
+  PIN1 = Off
+  GOTO Check3
+
+Light2On:
+  DEBUG "Light2On", CR
+  PIN2 = On
+  PAUSE 500
+  PIN2 = Off
+  GOTO Main
+
+LightsOn:
+  DEBUG "LightsOn", CR
+  PINS = %00011111
+  PAUSE 500
+  PINS = %00000000
+
+  GOTO Main
+
+  END
+
+
+' -----[ Subroutines ]-----------------------------------------------------
